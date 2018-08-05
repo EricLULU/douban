@@ -8,6 +8,8 @@ import pymongo
 import win32com.client
 import winsound
 
+from headers import headers_return    #导入headers
+
 # 定义全局变量
 count_book = 0          # 记录一共有多少书
 blank_page_count = 0  #记录空余页面次数
@@ -16,8 +18,16 @@ blank_page_count = 0  #记录空余页面次数
 #定义数据库的连接，完成数据库的初始化连接
 client = pymongo.MongoClient("mongodb://localhost:27017/")   #客户端初始化
 db = client.douban               #定义数据库
-collection = db.book_fourth         #定义数据库中的表
+collection = db.book_fifth         #定义数据库中的表
 Referer_url_list = []            #只存两个链接  
+flag_header = 0                  #headers 变换标识位     
+
+
+#定义时间变量，用于确定是否更换  user_agent,至少10分钟更换一次
+s_time = 0
+e_time = 0
+hea_ls = []   #headers列表
+headers = 0
 
 #定义全局列表，用于存储每个标签下的链接
 #tag_list = []
@@ -31,7 +41,9 @@ def downloader(url, num_retries=1):
     #proxies = proxies_get()  #获取代理
     #cookies = cookies_get()  #获取随机的cookies
     #User_Agent = user_agent_create()  #获取一个随机的代理
-    headers, proxies= headers_and_proxy(url)
+    headers, proxies = headers_and_proxy(url)            #获取headers和proxies
+    print("打印代理")
+    print(headers)
 
     #尝试下载html页面
     try:
@@ -139,17 +151,24 @@ def headers_and_proxy(url):
     获取 cookies 和 proxy，同时返回这两个数据
     利用proxy 来获取代理，同时利用代理来获取cookies，将cookies返回，利用此cookies来爬取数据
     """
+    global s_time
+    global e_time
+    global hea_ls
+    global flag_header 
+    global headers
+
     proxies = proxies_get()[0]     #获取代理, requests 使用的代理
     #proxy = proxies_get()[1]       #获取代理，selenium 使用的代理
-    User_Agent = user_agent_create()  #获取 user_agent
-    headers = {'User_Agent':User_Agent} 
-    r = requests.get(url, proxies=proxies, headers=headers)
-    cookies_list = []   #用来存储cookie
+    #User_Agent = user_agent_create()  #获取 user_agent
+    #headers = {'User_Agent':User_Agent} 
+    #r = requests.get(url, proxies=proxies, headers=headers)
+    #cookies_list = []   #用来存储cookie
+    """
     for key, value in r.cookies.items():
         cookie = '{}{}{}'.format(key,'=',value)   #合成cookie
         cookies_list.append(cookie)
     cookies = ','.join(cookies_list)     #cookies 设置
-
+    """
     """
     service_args = ['--proxy='+proxy,'--proxy-type=http']
     browser = webdriver.PhantomJS(service_args=service_args)    #获取浏览器,并设置代理
@@ -162,6 +181,7 @@ def headers_and_proxy(url):
     cookies = ','.join(c_list)
     """
     #headers = {'User_Agent':User_Agent, 'cookies':cookies}   #headers设置
+    """
     headers = {
             'Accept' : 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
             'Accept-Encoding' : 'gzip, deflate, sdch, br',
@@ -172,6 +192,21 @@ def headers_and_proxy(url):
             'User-Agent' : User_Agent,
             'Referer':'https://www.douban.com',
             }
+    """
+    if flag_header < 1:
+        #hea_ls.append(headers_return())    #随机赋值
+        headers = headers_return()
+        flag_header =1
+    e_time = time.time()
+    if e_time - s_time > 300:
+        #hea_ls.clear()  #清空列表
+        flag_header = 1  #标志位复位
+        #hea_ls.append(headers_return())    #获取headers
+        #hea_ls.pop(0)     #删除第一项
+        #headers = hea_ls[0]
+        s_time = e_time   #交换时间
+        headers = headers_return()  #获取随机headers
+    #print(headers)
     return headers, proxies           #f返回cookies 和 proxy，最好可以返回headers， 开始进行修改
 
 
@@ -197,7 +232,7 @@ def tag_parser(html):
         wrapper = soup.find(id='wrapper')
         try:
             h1 = wrapper.find('h1').string
-            print(h1)
+            #print(h1)
         except:
             print("H1出错")
 
@@ -206,7 +241,7 @@ def tag_parser(html):
             #这里会出错，需要使用try 。。。 except。。 结构来避免错误
             try:
                 h2 = tag.find('h2').string
-                print(h2)
+                #print(h2)
             except:
                 pass
 
@@ -258,7 +293,7 @@ def url_produce(url):
         url 产生， 用于产生每个标签页下的图书页面 url 的迭代 
     """
     params = "?start="
-    for i in range(51):
+    for i in range(21):
         url_tag = "{}{}{}".format(url, params, i*20)
         yield url_tag    #产生迭代值
 
@@ -328,7 +363,7 @@ def info_book_get(html):
             return p  #返回合适的信息
         except:
             #执行到这里的时候，只能说明这是一个 None 的html            
-            pass
+            print("解析出错")
 
         """
         if blank_page_count > random.randint(0,3):    #是否大于一个任意的随机整数
@@ -387,13 +422,14 @@ def make_alarm():
     flag = 0
     while True:
         speak.Speak('eric,程序运行完毕!')
-        if flag < 3:
+        if flag < 2:
             flag += 1
         else:
             break
 
 if __name__ == '__main__':
     count_book = 0
+    s_time = time.time()   #设置运行时间
 
     start_time = time.time()  #定义起始时间
     print(count_book)
